@@ -1,0 +1,23 @@
+{
+  "name": "minecraft-platform",
+  "version": "1.0.0",
+  "description": "Minecraft community platform with automated deployment",
+  "scripts": {
+    "deploy": "node scripts/deploy.js",
+    "deploy:staging": "node scripts/deploy.js staging",
+    "deploy:prod": "node scripts/deploy.js production",
+    "generate-env": "node scripts/generate-env.js",
+    "install-coolify": "node scripts/install-coolify.js",
+    "install-coolify:ssm": "node scripts/install-coolify-ssm.js"
+  },
+  "keywords": [
+    "minecraft",
+    "deployment",
+    "automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-ssh": "^13.2.1"
+  }
+}
