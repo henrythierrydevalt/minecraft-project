@@ -1,70 +1,161 @@
 # Plataforma de Comunidade Minecraft
 
-Este projeto foi desenvolvido exclusivamente para fins acadêmicos e educacionais. Não deve ser utilizado em ambientes de produção ou para casos de uso reais. O sistema não possui as medidas de segurança, validações e otimizações necessárias para uso em produção.
-
-## Aviso Importante
-
-Este é um projeto acadêmico. Não utilize emails reais durante os testes. Não implemente este sistema em ambientes de produção. O código foi criado para fins de aprendizado e demonstração de conceitos, não para uso real.
+Aplicação web full-stack desenvolvida para gerenciar uma comunidade de jogadores de Minecraft, permitindo cadastro de servidores, interação entre usuários através de posts, comentários, likes e chat em tempo real.
 
 ## Sobre o Projeto
 
-A plataforma é uma aplicação web completa que simula uma comunidade para jogadores de Minecraft. O sistema permite que usuários se cadastrem, criem posts, gerenciem servidores, interajam através de comentários e likes, e se comuniquem via chat.
+A plataforma é uma aplicação completa que permite aos usuários se cadastrar, criar e gerenciar posts sobre Minecraft, cadastrar servidores com verificação automática de status, interagir através de comentários e likes, se comunicar via chat privado, gerenciar inventário de itens e receber notificações sobre atividades na plataforma.
 
-O projeto foi construído usando tecnologias modernas de desenvolvimento web, incluindo NestJS para o backend, Next.js para o frontend, e PostgreSQL como banco de dados. A aplicação é containerizada com Docker e possui automação de deploy através de GitHub Actions.
+O sistema foi desenvolvido seguindo arquitetura de microsserviços, com backend e frontend completamente separados, comunicação via API REST com transferência de dados JSON, e toda a infraestrutura containerizada com Docker.
 
-## Estrutura do Projeto
+## Arquitetura
 
-O projeto está dividido em três partes principais: backend, frontend e infraestrutura de deploy.
+O projeto segue uma arquitetura de três camadas: frontend, backend e banco de dados. O backend é uma API REST construída com NestJS que expõe endpoints para todas as operações. O frontend é uma Single Page Application (SPA) construída com Next.js que consome a API através de requisições HTTP. O banco de dados PostgreSQL armazena todas as informações de forma relacional.
 
-O backend é uma API REST construída com NestJS. Ele gerencia toda a lógica de negócio, autenticação, e comunicação com o banco de dados. O frontend é uma aplicação Next.js que consome a API e apresenta a interface para os usuários. A infraestrutura inclui configurações Docker e scripts de deploy automatizado.
+A comunicação entre frontend e backend utiliza JSON para todas as operações GET e POST. O backend valida todas as requisições através de DTOs (Data Transfer Objects) e utiliza guards para proteger rotas que requerem autenticação.
 
-## Funcionalidades Principais
+## Backend
 
-O sistema possui módulos para autenticação de usuários, gerenciamento de posts, cadastro de servidores Minecraft, sistema de comentários e likes, chat entre usuários, notificações, e gerenciamento de itens do inventário.
+O backend foi construído com NestJS, um framework Node.js que utiliza TypeScript e segue padrões de arquitetura modular. A aplicação está organizada em módulos independentes, cada um responsável por uma funcionalidade específica.
 
-A autenticação utiliza JWT e permite registro e login de usuários. Os posts podem ser criados, visualizados, atualizados e deletados pelos seus autores. Os servidores Minecraft podem ser cadastrados e o sistema verifica automaticamente o status online ou offline através de APIs externas.
+### Módulos Implementados
 
-O sistema de chat permite que usuários se comuniquem entre si, com funcionalidades de bloqueio e silenciamento. As notificações alertam os usuários sobre novas interações. O módulo de itens simula um inventário básico para os jogadores.
+**Autenticação (Auth Module)**: Sistema completo de autenticação utilizando JWT (JSON Web Tokens). Implementa registro de novos usuários com hash de senha usando bcrypt, login com validação de credenciais, e proteção de rotas através de guards. O JWT é enviado no header Authorization de todas as requisições autenticadas.
+
+**Usuários (Users Module)**: Gerenciamento de perfis de usuários com sistema de níveis e experiência. Permite visualização de perfil, atualização de informações e busca de usuários. Implementa relacionamento com todas as outras entidades do sistema.
+
+**Posts (Posts Module)**: Sistema completo de posts com CRUD completo. Permite criação de posts com título, conteúdo, tags e categorias. Implementa paginação, busca por texto, filtros por categoria e ordenação por data ou popularidade. Relaciona posts com usuários, tags, comentários e likes.
+
+**Comentários (Comments Module)**: Sistema de comentários aninhados para posts. Permite criar comentários em posts, responder a outros comentários, editar e deletar comentários próprios. Implementa contagem de comentários por post.
+
+**Likes (Likes Module)**: Sistema de curtidas para posts. Permite que usuários curtam ou descurtam posts, com prevenção de curtidas duplicadas. Mantém contagem total de likes por post.
+
+**Servidores (Servers Module)**: Gerenciamento de servidores Minecraft. Permite cadastro de servidores com endereço IP ou domínio, porta, descrição e gamemode. Integra com APIs externas (mcstatus.io, mcsrvstat.us, mcapi.us) para verificação automática de status online/offline, número de jogadores, versão do servidor e informações detalhadas. Implementa sistema de votação para servidores e atualização periódica de status.
+
+**Itens (Items Module)**: Sistema de inventário para jogadores. Permite adicionar itens ao inventário do usuário, atualizar quantidades, remover itens e listar todos os itens de um jogador. Simula um sistema de inventário básico do Minecraft.
+
+**Tags (Tags Module)**: Sistema de categorização de posts através de tags. Permite criar tags, associar tags a posts, buscar posts por tag e listar todas as tags disponíveis.
+
+**Notificações (Notifications Module)**: Sistema de notificações em tempo real. Cria notificações automáticas para likes, comentários, mensagens e outras interações. Permite marcar notificações como lidas, contar notificações não lidas e listar histórico de notificações.
+
+**Chat (Chats Module)**: Sistema de mensagens privadas entre usuários. Permite iniciar conversas, enviar mensagens, listar conversas, visualizar histórico de mensagens, bloquear usuários e gerenciar solicitações de chat. Implementa validação para prevenir spam e mensagens de usuários bloqueados.
+
+### Banco de Dados
+
+O banco de dados PostgreSQL utiliza TypeORM como ORM (Object-Relational Mapping). Todas as entidades possuem relacionamentos bem definidos: User relaciona-se com Posts, Comments, Likes, Servers, Items, Notifications e Chats. Posts relacionam-se com Comments, Likes, Tags e PostViews. O sistema utiliza migrations automáticas através do TypeORM synchronize.
+
+As principais entidades incluem: User, Post, Comment, Like, Server, Item, Tag, Notification, Chat, ChatMessage, ChatRequest, Block e PostView. Cada entidade possui campos de auditoria (createdAt, updatedAt) e relacionamentos apropriados com chaves estrangeiras.
+
+### Segurança
+
+O backend implementa validação de dados através de class-validator e class-transformer. Todas as rotas protegidas requerem autenticação JWT. As senhas são hasheadas usando bcrypt antes de serem armazenadas. O sistema implementa CORS configurável para permitir requisições do frontend.
+
+## Frontend
+
+O frontend foi construído com Next.js 14 utilizando App Router, React Server Components e Client Components. A aplicação utiliza TypeScript para type safety e Tailwind CSS para estilização.
+
+### Páginas Implementadas
+
+**Página Inicial**: Landing page com informações sobre a plataforma e links para registro e login.
+
+**Login e Registro**: Páginas de autenticação com formulários validados, tratamento de erros e redirecionamento automático após login bem-sucedido.
+
+**Dashboard**: Área principal da aplicação com sidebar de navegação, exibindo diferentes seções conforme a rota acessada.
+
+**Feed**: Página principal que exibe todos os posts em formato de feed, com filtros por categoria, busca por texto, paginação e ordenação. Cada post exibe informações do autor, conteúdo, tags, contagem de likes e comentários.
+
+**Criar Post**: Página com formulário para criação de novos posts, incluindo campos para título, conteúdo, seleção de tags e categoria.
+
+**Servidores**: Página que lista todos os servidores cadastrados em formato de cards. Cada card exibe nome do servidor, endereço, status online/offline, número de jogadores, versão, gamemode e número de votos. Permite criar novos servidores, atualizar status e votar em servidores.
+
+**Jogadores**: Página que lista todos os usuários cadastrados na plataforma, permitindo visualizar perfis e estatísticas.
+
+**Chat**: Interface de mensagens privadas com lista de conversas, área de mensagens e formulário para envio. Exibe status online/offline dos usuários e timestamps das mensagens.
+
+**Notificações**: Página que exibe todas as notificações do usuário, permitindo marcar como lidas e filtrar por tipo.
+
+**Perfil**: Página de perfil do usuário logado, exibindo informações pessoais, estatísticas, posts criados e servidores cadastrados.
+
+**Itens**: Página de gerenciamento de inventário, permitindo visualizar, adicionar, editar e remover itens do inventário do jogador.
+
+### Componentes
+
+A aplicação possui componentes reutilizáveis como Sidebar (navegação), PostCard (exibição de posts), ServerCard (exibição de servidores), ChatContent (interface de chat), CreatePostForm (formulário de posts), FeedFilters (filtros do feed), Toast (notificações toast) e outros.
+
+Todos os componentes utilizam React Hooks para gerenciamento de estado, fazem requisições assíncronas à API e implementam tratamento de erros adequado.
+
+### Integração com API
+
+O frontend utiliza Axios para fazer requisições HTTP à API. Todas as requisições autenticadas incluem o token JWT no header Authorization. O sistema implementa interceptors para adicionar automaticamente o token e tratar erros 401 (não autorizado) redirecionando para a página de login.
+
+As funções de API estão organizadas em módulos: auth.ts, posts.ts, comments.ts, likes.ts, servers.ts, chats.ts, notifications.ts, items.ts e tags.ts. Cada módulo exporta funções específicas para interagir com os respectivos endpoints do backend.
+
+## Infraestrutura e Deploy
+
+### Docker
+
+Todo o projeto é containerizado utilizando Docker. Existem dois Dockerfiles: um para o backend (baseado em Node.js) e outro para o frontend (multi-stage build com Next.js). O docker-compose.yml configura todos os serviços necessários para desenvolvimento local, incluindo PostgreSQL, backend, frontend, Zabbix e Grafana.
+
+O docker-compose.prod.yml é utilizado para produção, com configurações otimizadas, volumes persistentes para banco de dados, variáveis de ambiente configuráveis e serviços de monitoramento.
+
+### GitHub Actions
+
+O projeto possui workflow automatizado de deploy através do GitHub Actions. Quando código é enviado para as branches `staging` ou `main`, o workflow executa automaticamente:
+
+1. Checkout do código
+2. Configuração de SSH para acesso ao servidor EC2
+3. Conexão ao servidor e execução de comandos de deploy
+4. Criação/atualização do arquivo .env com variáveis de ambiente
+5. Parada e remoção de containers antigos
+6. Limpeza de volumes quando necessário (para reset de senhas)
+7. Build e start dos containers Docker
+8. Verificação de saúde dos serviços
+9. Exibição de informações de acesso (Grafana, Zabbix, etc.)
+
+O workflow gerencia automaticamente problemas comuns como conflitos de volumes, containers órfãos e falhas de autenticação no banco de dados.
+
+### Monitoramento
+
+O projeto inclui integração com Zabbix para monitoramento de infraestrutura. O Zabbix monitora containers Docker, uso de CPU, memória, disco e rede, disponibilidade de serviços e logs de aplicação.
+
+O Grafana está configurado para visualização de métricas coletadas pelo Zabbix, permitindo criação de dashboards personalizados com gráficos de performance, disponibilidade e uso de recursos.
+
+Ambos os serviços são executados em containers Docker e são acessíveis através de portas configuradas no docker-compose.
+
+## Testes de API
+
+O projeto inclui uma coleção completa do Postman (postman_collection.json) com exemplos de todas as requisições da API. A coleção inclui:
+
+- Requisições de autenticação (registro, login)
+- CRUD completo de posts, comentários, likes
+- Gerenciamento de servidores (criar, listar, atualizar status, votar)
+- Operações de chat (iniciar conversa, enviar mensagem, listar conversas)
+- Gerenciamento de notificações
+- Operações com itens e tags
+- Busca e filtros
+
+Cada requisição está documentada com exemplos de body, headers necessários e respostas esperadas.
 
 ## Tecnologias Utilizadas
 
-O backend utiliza NestJS, TypeORM, PostgreSQL, e JWT para autenticação. O frontend utiliza Next.js, React, TypeScript e Tailwind CSS. A infraestrutura utiliza Docker, Docker Compose, e GitHub Actions para automação de deploy.
+**Backend**: NestJS, TypeScript, TypeORM, PostgreSQL, JWT, bcrypt, class-validator, class-transformer, axios
 
-O banco de dados PostgreSQL armazena todas as informações dos usuários, posts, servidores, comentários, likes, chats, notificações e itens. O TypeORM facilita a comunicação com o banco através de entidades e repositórios.
+**Frontend**: Next.js 14, React, TypeScript, Tailwind CSS, Axios, React Icons, cookies-next
 
-## Configuração e Deploy
+**Infraestrutura**: Docker, Docker Compose, GitHub Actions, AWS EC2, Zabbix, Grafana
 
-O projeto inclui configurações Docker para facilitar o desenvolvimento e deploy. Existem dois arquivos docker-compose: um para desenvolvimento local e outro para produção.
+**Ferramentas**: Postman, Git, GitHub
 
-O deploy é automatizado através de GitHub Actions. Quando código é enviado para as branches staging ou master, o workflow executa automaticamente o build e deploy da aplicação em um servidor EC2.
+## Estrutura de Branches
 
-O sistema de deploy configura automaticamente o ambiente, instala dependências, constrói as imagens Docker, e inicia os containers. O processo também gerencia variáveis de ambiente e credenciais através de secrets do GitHub.
+O projeto utiliza três branches principais:
 
-## Monitoramento
+- **main**: Branch de produção, deploy automático para servidor de produção
+- **staging**: Branch de staging, deploy automático para ambiente de testes
+- **develop**: Branch de desenvolvimento, utilizada para desenvolvimento de novas funcionalidades
 
-O projeto inclui integração com Zabbix para monitoramento de infraestrutura e Grafana para visualização de métricas. Esses serviços são opcionais e podem ser configurados durante o deploy.
+O workflow do GitHub Actions está configurado para fazer deploy automático sempre que código é enviado para `staging` ou `main`.
 
-O Zabbix monitora o estado dos containers, uso de recursos, e disponibilidade dos serviços. O Grafana apresenta dashboards com visualizações das métricas coletadas.
+## Nota sobre Uso
 
-## Limitações e Considerações
-
-Este projeto não possui validações robustas de segurança, não implementa rate limiting, não possui backup automatizado de dados, e não está otimizado para alta performance. O código foi desenvolvido para fins educacionais.
-
-Não utilize este sistema para armazenar dados reais ou informações sensíveis. Não implemente em ambientes onde a segurança é crítica. O projeto serve apenas como demonstração de conceitos e aprendizado.
-
-## Uso Acadêmico
-
-Este projeto pode ser utilizado como referência para estudos sobre desenvolvimento full-stack, arquitetura de APIs REST, integração frontend e backend, containerização com Docker, e automação de deploy.
-
-Os conceitos demonstrados incluem autenticação JWT, relacionamentos entre entidades em banco de dados, comunicação assíncrona entre serviços, e integração com APIs externas.
-
-## Estrutura de Arquivos
-
-O diretório backend contém todo o código da API, incluindo controllers, services, entities, DTOs, guards e estratégias de autenticação. O diretório frontend contém os componentes React, páginas Next.js, e bibliotecas de comunicação com a API.
-
-Os arquivos de configuração Docker estão na raiz do projeto, junto com os workflows do GitHub Actions. O arquivo postman_collection.json contém exemplos de requisições para testar a API.
-
-## Conclusão
-
-Este projeto foi desenvolvido exclusivamente para fins acadêmicos. Não utilize em produção. Não teste com emails reais. O código serve como material de estudo e demonstração de conceitos de desenvolvimento web moderno.
-
+Este projeto foi desenvolvido para fins acadêmicos e educacionais. Recomenda-se não utilizar emails reais durante testes e não implementar em ambientes de produção sem revisão adequada de segurança.
