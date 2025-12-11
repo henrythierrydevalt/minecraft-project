@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --minecraft-green: #7cb342;
+  --minecraft-dark-green: #558b2f;
+  --minecraft-dark: #0a0a0a;
+  --minecraft-darker: #050505;
+  --minecraft-stone: #3a3a3a;
+  --minecraft-dark-stone: #2a2a2a;
+}
+
+* {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--minecraft-dark);
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #e0e0e0;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+.minecraft-button {
+  background: linear-gradient(180deg, var(--minecraft-green) 0%, var(--minecraft-dark-green) 100%);
+  border: 2px solid #000;
+  box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.1s;
+  color: #fff;
+}
+
+.minecraft-button:hover {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #000, inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+.minecraft-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #000, inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+.minecraft-input {
+  background: var(--minecraft-dark-stone) !important;
+  border: 2px solid #000 !important;
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.3) !important;
+  color: #e0e0e0 !important;
+}
+
+.minecraft-input::placeholder {
+  color: #888 !important;
+}
+
+.minecraft-input:focus {
+  background: var(--minecraft-stone) !important;
+  outline: none;
+  border-color: var(--minecraft-green) !important;
+}
+
+select.minecraft-input {
+  background: var(--minecraft-dark-stone) !important;
+  color: #e0e0e0 !important;
+}
+
+select.minecraft-input option {
+  background: var(--minecraft-dark-stone) !important;
+  color: #e0e0e0 !important;
+}
+
+textarea.minecraft-input {
+  background: var(--minecraft-dark-stone) !important;
+  color: #e0e0e0 !important;
+  resize: vertical;
+}
+
+.minecraft-card {
+  background: linear-gradient(135deg, var(--minecraft-dark-stone) 0%, var(--minecraft-dark) 100%);
+  border: 3px solid #000;
+  box-shadow: 0 8px 0 #000, inset 0 2px 0 rgba(255, 255, 255, 0.05);
+}
+
+.minecraft-sidebar {
+  background: linear-gradient(180deg, var(--minecraft-dark-stone) 0%, var(--minecraft-dark) 100%);
+  border-right: 4px solid #000;
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.8);
+  border-left: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.minecraft-block {
+  background: linear-gradient(135deg, var(--minecraft-stone) 0%, var(--minecraft-dark-stone) 100%);
+  border: 2px solid #000;
+  box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255, 255, 255, 0.1);
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsividade adicional */
+@media (max-width: 640px) {
+  .minecraft-card,
+  .minecraft-block {
+    padding: 1rem;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Garantir que imagens sejam responsivas */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Scrollbar customizada para dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--minecraft-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--minecraft-stone);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--minecraft-dark-stone);
+}
