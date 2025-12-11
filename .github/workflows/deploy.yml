@@ -221,8 +221,26 @@ jobs:
             REMAINING=$(sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana|postgres)" | wc -l)
             if [ "$REMAINING" -gt 0 ]; then
               echo "Ainda existem $REMAINING containers. Forçando remoção..."
-              sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana|postgres)" | xargs -r sudo docker rm -f 2>/dev/null || true
+              sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana|postgres)" | while read name; do
+                echo "Removendo container: $name"
+                sudo docker stop "$name" -t 2 2>/dev/null || true
+                sudo docker rm -f "$name" 2>/dev/null || true
+              done || true
+              sleep 2
             fi
+            
+            # Última tentativa: remover containers específicos conhecidos que podem estar causando conflito
+            echo "Remoção final de containers específicos..."
+            for container in zabbix_postgres_prod zabbix_server_prod zabbix_web_prod zabbix_agent_prod \
+                            humberto-postgres-prod humberto-backend-prod humberto-frontend-prod \
+                            grafana_prod; do
+              if sudo docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+                echo "Forçando remoção do container: $container"
+                sudo docker stop "$container" -t 2 2>/dev/null || true
+                sudo docker rm -f "$container" 2>/dev/null || true
+              fi
+            done
+            sleep 2
             
             # Resetar volumes se necessário (AGORA que containers estão parados)
             if [ "$RESET_DB" = true ]; then
@@ -262,7 +280,25 @@ jobs:
             CONFLICT_CONTAINERS=$(sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto-postgres-prod|humberto-backend-prod|humberto-frontend-prod|zabbix_postgres_prod|zabbix_server_prod|zabbix_web_prod|zabbix_agent_prod|grafana_prod)" || true)
             if [ -n "$CONFLICT_CONTAINERS" ]; then
               echo "Ainda existem containers que podem causar conflito. Removendo..."
-              echo "$CONFLICT_CONTAINERS" | xargs -r sudo docker rm -f 2>/dev/null || true
+              echo "$CONFLICT_CONTAINERS" | while read name; do
+                echo "Removendo container conflitante: $name"
+                sudo docker stop "$name" -t 2 2>/dev/null || true
+                sudo docker rm -f "$name" 2>/dev/null || true
+              done || true
+              sleep 3
+            fi
+            
+            # Verificação absoluta final antes do deploy
+            echo "Verificação absoluta final antes do deploy..."
+            ALL_CONTAINERS=$(sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana)" || true)
+            if [ -n "$ALL_CONTAINERS" ]; then
+              echo "Containers encontrados antes do deploy:"
+              echo "$ALL_CONTAINERS"
+              echo "Forçando remoção de todos..."
+              echo "$ALL_CONTAINERS" | while read name; do
+                sudo docker stop "$name" -t 1 2>/dev/null || true
+                sudo docker rm -f "$name" 2>/dev/null || true
+              done || true
               sleep 2
             fi
             
