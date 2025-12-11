@@ -1,0 +1,1183 @@
+{
+	"info": {
+		"_postman_id": "humberto-api-collection",
+		"name": "Minecraft Community API",
+		"description": "Coleção completa da API do projeto Minecraft Community com todos os endpoints, testes automatizados e documentação.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "humberto-dev"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has user data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"auth_token\", jsonData.access_token);",
+									"    pm.collectionVariables.set(\"user_id\", jsonData.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"testuser\",\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						},
+						"description": "Registra um novo usuário no sistema. Retorna o token de autenticação JWT."
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has token\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"auth_token\", jsonData.access_token);",
+									"    pm.collectionVariables.set(\"user_id\", jsonData.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Autentica um usuário existente e retorna o token JWT."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de autenticação e registro de usuários."
+		},
+		{
+			"name": "Posts",
+			"item": [
+				{
+					"name": "Create Post",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"post_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Meu primeiro post\",\n    \"content\": \"Conteúdo do post aqui\",\n    \"category\": \"general\",\n    \"tags\": [\"minecraft\", \"survival\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/posts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts"
+							]
+						},
+						"description": "Cria um novo post. Requer autenticação."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Posts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/posts?page=1&limit=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "category",
+									"value": "general",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Lista todos os posts com paginação opcional."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Post by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/posts/{{post_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts",
+								"{{post_id}}"
+							]
+						},
+						"description": "Busca um post específico pelo ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Posts by User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/posts/user/{{user_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts",
+								"user",
+								"{{user_id}}"
+							]
+						},
+						"description": "Lista todos os posts de um usuário específico."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Post",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Título atualizado\",\n    \"content\": \"Conteúdo atualizado\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/posts/{{post_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts",
+								"{{post_id}}"
+							]
+						},
+						"description": "Atualiza um post existente. Apenas o dono pode atualizar."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Post",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/posts/{{post_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts",
+								"{{post_id}}"
+							]
+						},
+						"description": "Deleta um post. Apenas o dono pode deletar."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de posts."
+		},
+		{
+			"name": "Servers",
+			"item": [
+				{
+					"name": "Create Server",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"server_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Meu Servidor\",\n    \"address\": \"mc.example.com\",\n    \"port\": 25565,\n    \"description\": \"Servidor de Minecraft Survival\",\n    \"gamemode\": \"survival\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/servers",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers"
+							]
+						},
+						"description": "Cria um novo servidor. Requer autenticação."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Servers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers"
+							]
+						},
+						"description": "Lista todos os servidores cadastrados."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Server by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/{{server_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers",
+								"{{server_id}}"
+							]
+						},
+						"description": "Busca um servidor específico pelo ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Server Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/{{server_id}}/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers",
+								"{{server_id}}",
+								"details"
+							]
+						},
+						"description": "Busca detalhes completos de um servidor incluindo estatísticas."
+					},
+					"response": []
+				},
+				{
+					"name": "Vote Server",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/{{server_id}}/vote",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers",
+								"{{server_id}}",
+								"vote"
+							]
+						},
+						"description": "Vota em um servidor. Requer autenticação."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Server Status",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/{{server_id}}/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers",
+								"{{server_id}}",
+								"status"
+							]
+						},
+						"description": "Atualiza o status online/offline de um servidor."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Server",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/servers/{{server_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"servers",
+								"{{server_id}}"
+							]
+						},
+						"description": "Deleta um servidor. Apenas o dono pode deletar."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de servidores Minecraft."
+		},
+		{
+			"name": "Comments",
+			"item": [
+				{
+					"name": "Create Comment",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"content\": \"Ótimo post!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/comments/{{post_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"comments",
+								"{{post_id}}"
+							]
+						},
+						"description": "Cria um comentário em um post. Requer autenticação."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Comments by Post",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/comments/post/{{post_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"comments",
+								"post",
+								"{{post_id}}"
+							]
+						},
+						"description": "Lista todos os comentários de um post."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Comment",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/comments/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"comments",
+								":id"
+							]
+						},
+						"description": "Deleta um comentário. Apenas o dono pode deletar."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de comentários."
+		},
+		{
+			"name": "Likes",
+			"item": [
+				{
+					"name": "Toggle Like",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/likes/post/{{post_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"likes",
+								"post",
+								"{{post_id}}"
+							]
+						},
+						"description": "Adiciona ou remove um like de um post. Requer autenticação."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Like Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/likes/post/{{post_id}}/count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"likes",
+								"post",
+								"{{post_id}}",
+								"count"
+							]
+						},
+						"description": "Retorna a quantidade de likes de um post."
+					},
+					"response": []
+				},
+				{
+					"name": "Check Like Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/likes/post/{{post_id}}/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"likes",
+								"post",
+								"{{post_id}}",
+								"status"
+							]
+						},
+						"description": "Verifica se o usuário autenticado curtiu o post."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de likes."
+		},
+		{
+			"name": "Items",
+			"item": [
+				{
+					"name": "Create Item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Diamond Sword\",\n    \"type\": \"weapon\",\n    \"description\": \"Espada de diamante\",\n    \"quantity\": 1,\n    \"durability\": 100,\n    \"enchantmentLevel\": 5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/items",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"items"
+							]
+						},
+						"description": "Cria um novo item. Requer autenticação."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Items",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/items",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"items"
+							]
+						},
+						"description": "Lista todos os itens do usuário autenticado."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Item by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/items/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"items",
+								":id"
+							]
+						},
+						"description": "Busca um item específico pelo ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"quantity\": 2,\n    \"durability\": 80\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/items/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"items",
+								":id"
+							]
+						},
+						"description": "Atualiza um item existente."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/items/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"items",
+								":id"
+							]
+						},
+						"description": "Deleta um item."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de itens do inventário."
+		},
+		{
+			"name": "Tags",
+			"item": [
+				{
+					"name": "Get All Tags",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tags"
+							]
+						},
+						"description": "Lista todas as tags disponíveis."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Tags",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/search?q=minecraft",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tags",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "minecraft"
+								}
+							]
+						},
+						"description": "Busca tags por termo."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de tags."
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Get All Notifications",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications?unreadOnly=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "unreadOnly",
+									"value": "false",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Lista todas as notificações do usuário autenticado."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Unread Count",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								"count"
+							]
+						},
+						"description": "Retorna a quantidade de notificações não lidas."
+					},
+					"response": []
+				},
+				{
+					"name": "Mark as Read",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/:id/read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								":id",
+								"read"
+							]
+						},
+						"description": "Marca uma notificação como lida."
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All as Read",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/read-all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								"read-all"
+							]
+						},
+						"description": "Marca todas as notificações como lidas."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								":id"
+							]
+						},
+						"description": "Deleta uma notificação."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciamento de notificações."
+		},
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has status\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData.status).to.eql('ok');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Verifica o status de saúde da API."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de verificação de saúde do sistema."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "post_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "server_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
