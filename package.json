@@ -1,5 +1,5 @@
 {
-  "name": "minecraft-platform",
+  "name": "minecraft-platform", 
   "version": "1.0.0",
   "description": "Minecraft community platform with automated deployment",
   "scripts": {
