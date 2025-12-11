@@ -1,0 +1,357 @@
+name: Deploy Full Application
+
+on:
+  push:
+    branches:
+      - staging
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Full Application to EC2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Verificar conexão SSH
+        run: |
+          echo "Testando conexão SSH..."
+          for i in {1..5}; do
+            if ssh -i ~/.ssh/ec2_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              -o ServerAliveInterval=10 \
+              -o ServerAliveCountMax=30 \
+              -o TCPKeepAlive=yes \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'Conexão OK'" 2>&1; then
+              echo "Conexão SSH estabelecida!"
+              exit 0
+            else
+              echo "Tentativa $i/5 falhou, aguardando 10 segundos..."
+              sleep 10
+            fi
+          done
+          echo "Não foi possível conectar via SSH após 5 tentativas"
+          exit 1
+
+      - name: Criar diretórios no servidor
+        run: |
+          echo "Criando diretórios necessários..."
+          ssh -i ~/.ssh/ec2_key.pem \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=10 \
+            -o ServerAliveCountMax=30 \
+            -o TCPKeepAlive=yes \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "sudo mkdir -p /opt/humberto/backend /opt/humberto/frontend && sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /opt/humberto && sudo chmod -R 755 /opt/humberto"
+
+      - name: Copiar arquivos para EC2
+        run: |
+          echo "Copiando arquivos do projeto..."
+          rsync -avz --delete --progress \
+            -e "ssh -i ~/.ssh/ec2_key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10" \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='.next' \
+            --exclude='dist' \
+            --exclude='test-server' \
+            --timeout=120 \
+            ./backend/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/humberto/backend/
+          rsync -avz --delete --progress \
+            -e "ssh -i ~/.ssh/ec2_key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10" \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --timeout=120 \
+            ./frontend/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/humberto/frontend/
+          rsync -avz \
+            -e "ssh -i ~/.ssh/ec2_key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
+            docker-compose.prod.yml ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/humberto/
+
+      - name: Deploy Completo
+        timeout-minutes: 30
+        run: |
+          ssh -i ~/.ssh/ec2_key.pem \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=10 \
+            -o ServerAliveCountMax=30 \
+            -o TCPKeepAlive=yes \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            
+            cd /opt/humberto
+            
+            # Verificar e instalar Docker se necessário
+            if ! command -v docker &> /dev/null; then
+              echo "Instalando Docker..."
+              
+              # Aguardar lock do apt ser liberado
+              echo "Aguardando lock do apt ser liberado..."
+              while sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+                echo "Lock do apt ainda ativo, aguardando 5 segundos..."
+                sleep 5
+              done
+              
+              sudo apt-get update -y
+              sudo apt-get install -y ca-certificates curl
+              sudo install -m 0755 -d /etc/apt/keyrings
+              sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+              sudo chmod a+r /etc/apt/keyrings/docker.asc
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              
+              # Aguardar lock novamente antes de instalar
+              while sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+                echo "Lock do apt ainda ativo, aguardando 5 segundos..."
+                sleep 5
+              done
+              
+              sudo apt-get update -y
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              sudo usermod -aG docker $USER
+              echo "Docker instalado!"
+            fi
+            
+            # Garantir que Docker está rodando
+            sudo systemctl start docker || true
+            sudo chmod 666 /var/run/docker.sock || true
+            
+            # Preparar credenciais (usar secrets ou gerar)
+            DB_PASS="${{ secrets.DB_PASSWORD }}"
+            if [ -z "$DB_PASS" ]; then
+              DB_PASS=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-20)
+              echo "DB_PASSWORD não encontrado nos secrets, gerando aleatório"
+            fi
+            
+            JWT_SECRET="${{ secrets.JWT_SECRET }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-40)
+              echo "JWT_SECRET não encontrado nos secrets, gerando aleatório"
+            fi
+            
+            ZABBIX_PASS="${{ secrets.ZABBIX_DB_PASSWORD }}"
+            if [ -z "$ZABBIX_PASS" ]; then
+              ZABBIX_PASS=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-20)
+              echo "ZABBIX_DB_PASSWORD não encontrado nos secrets, gerando aleatório"
+            fi
+            
+            GRAFANA_PASS="${{ secrets.GRAFANA_PASSWORD }}"
+            if [ -z "$GRAFANA_PASS" ]; then
+              GRAFANA_PASS=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-20)
+              echo "GRAFANA_PASSWORD não encontrado nos secrets, gerando aleatório"
+            fi
+            
+            # Verificar se .env existe e se a senha mudou
+            RESET_DB=false
+            if [ ! -f .env ]; then
+              echo "Criando arquivo .env..."
+              RESET_DB=true
+            else
+              # Verificar se a senha do DB mudou
+              OLD_DB_PASS=$(grep "^DB_PASSWORD=" .env 2>/dev/null | cut -d'=' -f2 || echo "")
+              if [ "$OLD_DB_PASS" != "$DB_PASS" ]; then
+                echo "Senha do DB mudou, será necessário resetar o volume"
+                RESET_DB=true
+              else
+                echo "Arquivo .env já existe com senha correta"
+              fi
+            fi
+            
+            # Criar/atualizar .env
+            printf "PORT=3000\nDB_HOST=postgres\nDB_PORT=5432\nDB_USERNAME=postgres\nDB_PASSWORD=%s\nDB_NAME=minecraft_db\nJWT_SECRET=%s\nNODE_ENV=production\nFRONTEND_URL=http://${{ secrets.EC2_HOST }}:3001\nNEXT_PUBLIC_API_URL=http://${{ secrets.EC2_HOST }}:3000\nBACKEND_URL=http://backend:3000\nDOCKER_ENV=true\nPORT=3001\nZABBIX_DB_PASSWORD=%s\nGRAFANA_USER=admin\nGRAFANA_PASSWORD=%s\nTIMEZONE=America/Sao_Paulo\n" "$DB_PASS" "$JWT_SECRET" "$ZABBIX_PASS" "$GRAFANA_PASS" > .env
+            chmod 600 .env
+            echo "Arquivo .env criado/atualizado!"
+            
+            # Parar e remover containers antigos PRIMEIRO (antes de remover volumes)
+            echo "Parando e removendo containers antigos..."
+            sudo docker compose -f docker-compose.prod.yml down --remove-orphans --volumes 2>/dev/null || true
+            
+            # Parar todos os containers relacionados
+            echo "Parando containers relacionados..."
+            sudo docker stop $(sudo docker ps -aq --filter "name=humberto") 2>/dev/null || true
+            sudo docker stop $(sudo docker ps -aq --filter "name=zabbix") 2>/dev/null || true
+            sudo docker stop $(sudo docker ps -aq --filter "name=grafana") 2>/dev/null || true
+            
+            # Remover containers órfãos manualmente se necessário
+            echo "Removendo containers órfãos..."
+            # Remover por filtros de nome
+            sudo docker ps -a --filter "name=humberto" -q | xargs -r sudo docker rm -f 2>/dev/null || true
+            sudo docker ps -a --filter "name=zabbix" -q | xargs -r sudo docker rm -f 2>/dev/null || true
+            sudo docker ps -a --filter "name=grafana" -q | xargs -r sudo docker rm -f 2>/dev/null || true
+            
+            # Remover containers específicos conhecidos pelo nome exato (caso os filtros não funcionem)
+            echo "Removendo containers específicos por nome..."
+            for container in humberto-postgres-prod humberto-backend-prod humberto-frontend-prod \
+                            zabbix_postgres_prod zabbix_server_prod zabbix_web_prod zabbix_agent_prod \
+                            grafana_prod zabbix-db zabbix-server zabbix-web zabbix-agent; do
+              sudo docker stop "$container" 2>/dev/null || true
+              sudo docker rm -f "$container" 2>/dev/null || true
+            done
+            
+            # Garantir que não há containers rodando que possam causar conflito
+            echo "Verificando containers restantes..."
+            sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana)" | xargs -r sudo docker rm -f 2>/dev/null || true
+            
+            # Aguardar um pouco para garantir que tudo foi removido
+            sleep 3
+            
+            # Resetar volumes se necessário (AGORA que containers estão parados)
+            if [ "$RESET_DB" = true ]; then
+              echo "Resetando volumes do banco de dados para usar novas senhas..."
+              # Remover volumes do PostgreSQL (tentar diferentes nomes possíveis)
+              sudo docker volume ls -q | grep -E "(postgres_data|humberto.*postgres)" | xargs -r sudo docker volume rm -f 2>/dev/null || true
+              # Remover volumes do Zabbix (tentar diferentes nomes possíveis)
+              sudo docker volume ls -q | grep -E "(zabbix.*db|zabbix_db_data)" | xargs -r sudo docker volume rm -f 2>/dev/null || true
+              echo "Volumes do banco removidos (serão recriados com novas senhas)"
+            fi
+            
+            # Verificar se senha do Grafana mudou ou se é primeira vez
+            OLD_GRAFANA_PASS=""
+            if [ -f .env ]; then
+              OLD_GRAFANA_PASS=$(grep "^GRAFANA_PASSWORD=" .env 2>/dev/null | cut -d'=' -f2 || echo "")
+            fi
+            if [ "$OLD_GRAFANA_PASS" != "$GRAFANA_PASS" ]; then
+              echo "Resetando volume do Grafana para usar nova senha..."
+              # Remover volumes do Grafana (tentar diferentes nomes possíveis)
+              sudo docker volume ls -q | grep -E "(grafana_data|humberto.*grafana)" | xargs -r sudo docker volume rm -f 2>/dev/null || true
+              echo "Volume do Grafana removido (será recriado com nova senha)"
+            fi
+            
+            # Limpar cache do Docker para evitar problemas
+            echo "Limpando cache do Docker..."
+            sudo docker system prune -f || true
+            
+            # Verificação final: garantir que containers específicos não existam
+            echo "Verificação final de containers..."
+            CONFLICT_CONTAINERS=$(sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto-postgres-prod|humberto-backend-prod|humberto-frontend-prod|zabbix_postgres_prod|zabbix_server_prod|zabbix_web_prod|zabbix_agent_prod|grafana_prod)" || true)
+            if [ -n "$CONFLICT_CONTAINERS" ]; then
+              echo "Ainda existem containers que podem causar conflito. Removendo..."
+              echo "$CONFLICT_CONTAINERS" | xargs -r sudo docker rm -f 2>/dev/null || true
+              sleep 2
+            fi
+            
+            # Deploy completo com rebuild
+            echo "Fazendo deploy completo da aplicação..."
+            echo "Isso pode levar vários minutos para buildar os containers..."
+            echo "Build será executado com output em tempo real..."
+            
+            # Carregar variáveis do .env e exportar para o docker-compose
+            # O docker-compose carrega automaticamente o .env se estiver no mesmo diretório
+            export DB_PASSWORD="$DB_PASS"
+            export DB_USERNAME="postgres"
+            export DB_NAME="minecraft_db"
+            export JWT_SECRET="$JWT_SECRET"
+            export ZABBIX_DB_PASSWORD="$ZABBIX_PASS"
+            export GRAFANA_PASSWORD="$GRAFANA_PASS"
+            export GRAFANA_USER="admin"
+            export TIMEZONE="America/Sao_Paulo"
+            export FRONTEND_URL="http://${{ secrets.EC2_HOST }}:3001"
+            export NEXT_PUBLIC_API_URL="http://${{ secrets.EC2_HOST }}:3000"
+            
+            # Executar build com output em tempo real e timeout de 20 minutos
+            # O docker-compose v2 carrega automaticamente o .env do diretório atual
+            timeout 1200 sudo -E docker compose -f docker-compose.prod.yml up --build -d || {
+              echo "Build falhou ou timeout. Verificando logs..."
+              sudo docker compose -f docker-compose.prod.yml logs --tail=50 || true
+              exit 1
+            }
+            
+            # Aguardar containers iniciarem
+            echo "Aguardando containers iniciarem..."
+            sleep 30
+            
+            # Verificar se há problemas de autenticação no PostgreSQL
+            echo "Verificando logs do PostgreSQL..."
+            sleep 10
+            if sudo docker logs humberto-postgres-prod 2>&1 | grep -q "password authentication failed"; then
+              echo "Detectado problema de autenticação no PostgreSQL. Removendo volumes e recriando..."
+              sudo docker compose -f docker-compose.prod.yml down --volumes 2>/dev/null || true
+              sudo docker volume ls -q | grep -E "(postgres_data|humberto.*postgres)" | xargs -r sudo docker volume rm -f 2>/dev/null || true
+              echo "Recriando containers..."
+              timeout 1200 sudo -E docker compose -f docker-compose.prod.yml up -d postgres || true
+              sleep 15
+              timeout 1200 sudo -E docker compose -f docker-compose.prod.yml up -d || true
+              sleep 20
+            fi
+            
+            if sudo docker logs zabbix_postgres_prod 2>&1 | grep -q "password authentication failed"; then
+              echo "Detectado problema de autenticação no Zabbix PostgreSQL. Removendo volumes e recriando..."
+              sudo docker volume ls -q | grep -E "(zabbix.*db|zabbix_db_data)" | xargs -r sudo docker volume rm -f 2>/dev/null || true
+              sudo docker compose -f docker-compose.prod.yml restart zabbix-db zabbix-server zabbix-web 2>/dev/null || true
+              sleep 15
+            fi
+            
+            # Verificar backend
+            echo "Verificando backend..."
+            for i in {1..10}; do
+              if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+                echo "Backend está funcionando!"
+                break
+              else
+                echo "Tentativa $i/10 - aguardando backend..."
+                if [ $i -eq 10 ]; then
+                  echo "Backend não respondeu. Verificando logs..."
+                  sudo docker logs humberto-backend-prod --tail=20 || true
+                fi
+                sleep 5
+              fi
+            done
+            
+            # Verificar frontend
+            echo "Verificando frontend..."
+            sleep 10
+            for i in {1..10}; do
+              if curl -f http://localhost:3001 > /dev/null 2>&1; then
+                echo "Frontend está funcionando!"
+                break
+              else
+                echo "Tentativa $i/10 - aguardando frontend..."
+                sleep 5
+              fi
+            done
+            
+            # Verificar Grafana
+            echo "Verificando Grafana..."
+            sleep 5
+            if curl -f http://localhost:3002/api/health > /dev/null 2>&1; then
+              echo "Grafana está funcionando!"
+            else
+              echo "Grafana pode não estar respondendo corretamente"
+            fi
+            
+            echo "Deploy concluído!"
+          EOF
+
+      - name: Informações de acesso
+        run: |
+          echo "Deploy concluído com sucesso!"
+          echo ""
+          echo "URLs para acessar a aplicação:"
+          echo "   • Frontend: http://${{ secrets.EC2_HOST }}:3001"
+          echo "   • Backend API: http://${{ secrets.EC2_HOST }}:3000"
+          echo "   • Backend Health: http://${{ secrets.EC2_HOST }}:3000/health"
+          echo "   • Grafana: http://${{ secrets.EC2_HOST }}:3002"
+          echo "   • Zabbix Web: http://${{ secrets.EC2_HOST }}:8080"
+          echo ""
+          echo "Credenciais:"
+          echo "   • Grafana:"
+          echo "     - Usuário: admin"
+          echo "     - Senha: (verifique o secret GRAFANA_PASSWORD no GitHub)"
+          echo ""
+          echo "Certifique-se de que o Security Group permite tráfego nas portas:"
+          echo "   • Porta 3000 (Backend) - Tipo: Custom TCP | Origem: 0.0.0.0/0"
+          echo "   • Porta 3001 (Frontend) - Tipo: Custom TCP | Origem: 0.0.0.0/0"
+          echo "   • Porta 3002 (Grafana) - Tipo: Custom TCP | Origem: 0.0.0.0/0"
+          echo "   • Porta 8080 (Zabbix) - Tipo: Custom TCP | Origem: 0.0.0.0/0"
+
