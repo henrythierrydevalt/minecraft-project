@@ -176,36 +176,53 @@ jobs:
             
             # Parar e remover containers antigos PRIMEIRO (antes de remover volumes)
             echo "Parando e removendo containers antigos..."
-            sudo docker compose -f docker-compose.prod.yml down --remove-orphans --volumes 2>/dev/null || true
             
-            # Parar todos os containers relacionados
+            # Primeiro, tentar usar docker compose down
+            sudo docker compose -f docker-compose.prod.yml down --remove-orphans --volumes 2>/dev/null || true
+            sudo docker-compose -f docker-compose.prod.yml down --remove-orphans --volumes 2>/dev/null || true
+            
+            # Parar todos os containers relacionados (forçar parada)
             echo "Parando containers relacionados..."
-            sudo docker stop $(sudo docker ps -aq --filter "name=humberto") 2>/dev/null || true
-            sudo docker stop $(sudo docker ps -aq --filter "name=zabbix") 2>/dev/null || true
-            sudo docker stop $(sudo docker ps -aq --filter "name=grafana") 2>/dev/null || true
+            sudo docker ps -aq --filter "name=humberto" | xargs -r sudo docker stop -t 5 2>/dev/null || true
+            sudo docker ps -aq --filter "name=zabbix" | xargs -r sudo docker stop -t 5 2>/dev/null || true
+            sudo docker ps -aq --filter "name=grafana" | xargs -r sudo docker stop -t 5 2>/dev/null || true
+            sudo docker ps -aq --filter "name=postgres" | xargs -r sudo docker stop -t 5 2>/dev/null || true
             
             # Remover containers órfãos manualmente se necessário
             echo "Removendo containers órfãos..."
-            # Remover por filtros de nome
+            # Remover por filtros de nome (forçar remoção)
             sudo docker ps -a --filter "name=humberto" -q | xargs -r sudo docker rm -f 2>/dev/null || true
             sudo docker ps -a --filter "name=zabbix" -q | xargs -r sudo docker rm -f 2>/dev/null || true
             sudo docker ps -a --filter "name=grafana" -q | xargs -r sudo docker rm -f 2>/dev/null || true
+            sudo docker ps -a --filter "name=postgres" -q | xargs -r sudo docker rm -f 2>/dev/null || true
             
             # Remover containers específicos conhecidos pelo nome exato (caso os filtros não funcionem)
             echo "Removendo containers específicos por nome..."
             for container in humberto-postgres-prod humberto-backend-prod humberto-frontend-prod \
                             zabbix_postgres_prod zabbix_server_prod zabbix_web_prod zabbix_agent_prod \
-                            grafana_prod zabbix-db zabbix-server zabbix-web zabbix-agent; do
-              sudo docker stop "$container" 2>/dev/null || true
+                            grafana_prod zabbix-db zabbix-server zabbix-web zabbix-agent \
+                            postgres zabbix-postgres; do
+              sudo docker stop "$container" -t 5 2>/dev/null || true
               sudo docker rm -f "$container" 2>/dev/null || true
             done
             
             # Garantir que não há containers rodando que possam causar conflito
             echo "Verificando containers restantes..."
-            sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana)" | xargs -r sudo docker rm -f 2>/dev/null || true
+            sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana|postgres)" | while read name; do
+              sudo docker stop "$name" -t 5 2>/dev/null || true
+              sudo docker rm -f "$name" 2>/dev/null || true
+            done || true
             
             # Aguardar um pouco para garantir que tudo foi removido
-            sleep 3
+            sleep 5
+            
+            # Verificação final - listar containers restantes
+            echo "Verificação final de containers..."
+            REMAINING=$(sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana|postgres)" | wc -l)
+            if [ "$REMAINING" -gt 0 ]; then
+              echo "Ainda existem $REMAINING containers. Forçando remoção..."
+              sudo docker ps -a --format "{{.Names}}" | grep -E "(humberto|zabbix|grafana|postgres)" | xargs -r sudo docker rm -f 2>/dev/null || true
+            fi
             
             # Resetar volumes se necessário (AGORA que containers estão parados)
             if [ "$RESET_DB" = true ]; then
@@ -228,6 +245,13 @@ jobs:
               sudo docker volume ls -q | grep -E "(grafana_data|humberto.*grafana)" | xargs -r sudo docker volume rm -f 2>/dev/null || true
               echo "Volume do Grafana removido (será recriado com nova senha)"
             fi
+            
+            # Remover redes antigas que possam causar conflito
+            echo "Removendo redes antigas..."
+            sudo docker network rm humberto_minecraft_network 2>/dev/null || true
+            sudo docker network rm minecraft_network 2>/dev/null || true
+            sudo docker network ls --filter "name=minecraft" -q | xargs -r sudo docker network rm 2>/dev/null || true
+            sudo docker network ls --filter "name=humberto" -q | xargs -r sudo docker network rm 2>/dev/null || true
             
             # Limpar cache do Docker para evitar problemas
             echo "Limpando cache do Docker..."
